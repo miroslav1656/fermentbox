@@ -171,7 +171,7 @@ pio run -t upload
 - Stále platí bezpečnostní limity!
 
 ### Serial příkazy
-- `0-4` - Změna programu
+- `0-4` - Změna programu (prvních 5 programů, viz seznam výše)
 - `t` - Toggle AUTO/MANUAL režim
 - `p` - Vypsat aktuální program
 - `h/u/c/f` - Ovládání aktuátorů (v MANUAL)
@@ -193,16 +193,21 @@ Funkce:
 
 ## Přednastavené programy
 
-1. **Panettone Bulk** - 28°C, 80% RH
-2. **Panettone Proof** - 28°C, 80% RH
-3. **Croissant Bulk** - 24°C, 75% RH
-4. **Croissant Proof** - 26°C, 80% RH
-5. **Chleba Bulk** - 24°C, 75% RH
-6. **Chleba Cold** - 5°C (chlazení), 75% RH
-7. **Chleba Proof** - 32°C, 85% RH
-8. **Kváskový starter Active** - 28°C, 75% RH
-9. **Kváskový starter Sleep** - 4°C (lednice), 70% RH
-10. **Custom** - Vlastní nastavení
+V kódu je definováno 10 programů, ale Serial Monitor aktuálně podporuje jen přepínání prvních 5 příkazem `0-4`. Všechny programy jsou dostupné přes webové rozhraní.
+
+**Dostupné přes Serial (0-4):**
+0. **Panettone Bulk (testo)** - 26°C, 60% RH, 12 hodin
+1. **Panettone Proof (forma)** - 28°C, 70% RH, 5 hodin
+2. **Croissant Bulk (testo)** - 24°C, 70% RH, 2 hodiny
+3. **Croissant Proof (kynutí)** - 25.5°C, 75% RH, 1.5 hodiny
+4. **Chleba Bulk (teplý)** - 25°C, 70% RH, 2 hodiny
+
+**Dostupné jen přes Web UI (5-9):**
+5. **Chleba Cold (lednice)** - 5°C (chlazení), 60% RH, 12 hodin
+6. **Chleba Proof (forma)** - 25°C, 75% RH, 45 minut
+7. **Lievito Madre (aktivace)** - 28°C, 50% RH (bez zvlhčení), 4 hodiny
+8. **Lievito Madre (spánek)** - 18°C, 50% RH, 8 hodin
+9. **Custom (vlastní)** - Vlastní nastavení, neomezený čas
 
 ## Licence
 
