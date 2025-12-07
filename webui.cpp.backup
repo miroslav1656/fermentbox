@@ -60,18 +60,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <title>FermentorBox</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="FermentorBox">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color-scheme: dark;
-    --color-heating: #ef4444;
-    --color-cooling: #3b82f6;
-    --color-humidifying: #06b6d4;
   }
 
   * {
@@ -82,8 +76,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     margin: 0;
     background: #020617;
     color: #e5e7eb;
-    font-size: 16px;
-    -webkit-text-size-adjust: 100%;
   }
 
   .page {
@@ -93,75 +85,21 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   }
 
   header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    padding: 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid #111827;
     background: radial-gradient(circle at top left, #1f2937 0, #020617 45%);
-    backdrop-filter: blur(10px);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  header .header-left {
-    flex: 1;
   }
 
   header h1 {
     margin: 0;
-    font-size: 24px;
+    font-size: 20px;
     letter-spacing: 0.03em;
   }
 
   header .sub {
     margin-top: 4px;
-    font-size: 14px;
+    font-size: 12px;
     color: #9ca3af;
-  }
-
-  .panic-btn {
-    padding: 12px 24px;
-    background: #dc2626;
-    border-radius: 12px;
-    border: 2px solid #dc2626;
-    color: #fff;
-    font-size: 18px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-    min-width: 180px;
-    text-align: center;
-  }
-
-  .panic-btn:hover {
-    background: #b91c1c;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.6);
-  }
-
-  .panic-btn.active {
-    background: #16a34a;
-    border-color: #16a34a;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-
-  @media (max-width: 768px) {
-    header h1 { font-size: 20px; }
-    .panic-btn { 
-      font-size: 16px;
-      padding: 10px 20px;
-      min-width: 150px;
-    }
   }
 
   .grid {
@@ -288,21 +226,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   }
 
   .stat-value {
-    font-size: 48px;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  .stat-value.heating {
-    color: var(--color-heating);
-  }
-
-  .stat-value.cooling {
-    color: var(--color-cooling);
-  }
-
-  .stat-value.humidifying {
-    color: var(--color-humidifying);
+    font-size:14px;
+    font-weight:500;
   }
 
   .stat-extra {
@@ -413,35 +338,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     color:#fee2e2;
   }
 
-  .badge-panic {
-    font-size:13px;
-    padding:4px 12px;
-    border-radius:999px;
-    background:rgba(220,38,38,0.2);
-    border:2px solid rgba(220,38,38,0.8);
-    color:#fee2e2;
-    font-weight:600;
-    animation: pulse 2s infinite;
-  }
-
-  .countdown-timer {
-    font-size: 36px;
-    font-weight: 700;
-    color: #22c55e;
-    text-align: center;
-    padding: 16px;
-    margin: 12px 0;
-    background: rgba(34, 197, 94, 0.1);
-    border: 2px solid rgba(34, 197, 94, 0.3);
-    border-radius: 12px;
-  }
-
-  .countdown-timer.warning {
-    color: #eab308;
-    border-color: rgba(234, 179, 8, 0.3);
-    background: rgba(234, 179, 8, 0.1);
-  }
-
   .section-title {
     font-size:13px;
     font-weight:500;
@@ -453,115 +349,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     font-size:11px;
     color:#6b7280;
   }
-
-  /* Toggle Switch Styles */
-  .toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 56px;
-    height: 28px;
-  }
-
-  .toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  .toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #374151;
-    transition: .3s;
-    border-radius: 28px;
-  }
-
-  .toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 4px;
-    bottom: 4px;
-    background-color: white;
-    transition: .3s;
-    border-radius: 50%;
-  }
-
-  .toggle-switch input:checked + .toggle-slider {
-    background-color: #0f766e;
-  }
-
-  .toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(28px);
-  }
-
-  .toggle-switch input:disabled + .toggle-slider {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* Touch-friendly buttons for iPad */
-  button {
-    padding: 12px 20px;
-    background: #0f766e;
-    border-radius: 10px;
-    border: none;
-    color: #ecfeff;
-    font-size: 16px;
-    cursor: pointer;
-    min-height: 44px;
-    transition: all 0.2s;
-  }
-
-  button:hover {
-    background: #0d9488;
-    transform: translateY(-2px);
-  }
-
-  button:active {
-    transform: translateY(0);
-  }
-
-  button.secondary {
-    background: #111827;
-    border: 1px solid #374151;
-    color: #e5e7eb;
-  }
-
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* Responsive grid for tablets */
-  @media (min-width: 768px) and (max-width: 1280px) {
-    .grid {
-      grid-template-columns: minmax(0, 1fr);
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    
-    .stat-value {
-      font-size: 42px;
-    }
-  }
 </style>
 </head>
 <body>
 <div class="page">
   <header>
-    <div class="header-left">
-      <h1>FermentorBox</h1>
-      <div class="sub">Řízení kynutí – panettone, croissanty, chléb, lievito madre…</div>
-    </div>
-    <button id="panicBtn" class="panic-btn" onclick="togglePanic()">
-      <span id="panicText">PANIC STOP</span>
-    </button>
+    <h1>FermentorBox</h1>
+    <div class="sub">Řízení kynutí – panettone, croissanty, chléb, lievito madre…</div>
   </header>
 
   <div class="grid">
@@ -579,11 +373,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             <span class="pill-dot" id="modeDot"></span>
             <span id="modeText">Režim: AUTO</span>
           </div>
-        </div>
-
-        <div id="countdownTimer" class="countdown-timer" style="display:none;">
-          <div style="font-size:14px; margin-bottom:8px;">Čas do konce</div>
-          <span id="countdownText">--:--:--</span>
         </div>
 
         <div class="progress-container">
@@ -744,25 +533,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
         <button style="margin-top:8px;" onclick="saveConfig()">Uložit kalibraci</button>
       </div>
-
-      <div class="card" style="margin-top:12px;">
-        <div class="label">WiFi nastavení</div>
-
-        <div class="custom-row">
-          <label for="wifiSSID">SSID:</label>
-          <input type="text" id="wifiSSID" maxlength="32">
-        </div>
-        <div class="custom-row">
-          <label for="wifiPass">Heslo:</label>
-          <input type="text" id="wifiPass" maxlength="64">
-        </div>
-
-        <div class="hint">
-          Po uložení se ESP32 restartuje a pokusí se připojit k nové síti. Pokud se připojení nezdaří, spustí se AP režim (FermentorBox).
-        </div>
-
-        <button style="margin-top:8px;" onclick="saveWifi()">Uložit a Restartovat</button>
-      </div>
     </div>
 
   </div>
@@ -896,26 +666,9 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       const rem = s.remainingMin ?? 0;
       let timeText = '';
 
-      // Countdown timer
-      const countdownDiv = document.getElementById('countdownTimer');
-      const countdownText = document.getElementById('countdownText');
-      if (dur > 0 && rem > 0) {
-        countdownDiv.style.display = 'block';
-        const remSec = Math.floor(rem * 60);
-        const hours = Math.floor(remSec / 3600);
-        const mins = Math.floor((remSec % 3600) / 60);
-        const secs = remSec % 60;
-        countdownText.textContent = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        
-        if (rem < 10) {
-          countdownDiv.classList.add('warning');
-        } else {
-          countdownDiv.classList.remove('warning');
-        }
-        
+      if (dur > 0) {
         timeText = `Uplynulo ${elapsed.toFixed(1)} min, zbývá ${rem.toFixed(1)} min z ${dur.toFixed(1)} min.`;
       } else {
-        countdownDiv.style.display = 'none';
         timeText = `Program bez omezení času, běží ${elapsed.toFixed(1)} min.`;
       }
       document.getElementById('progTime').textContent = timeText;
@@ -926,35 +679,22 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       if (progress > 100) progress = 100;
       progFill.style.width = progress + '%';
 
-      // Režim (AUTO / TEST / PANIC)
+      // Režim (AUTO / TEST)
       const modePill = document.getElementById('modePill');
       const modeDot  = document.getElementById('modeDot');
       const modeText = document.getElementById('modeText');
       const btnToggle = document.getElementById('btnToggleTest');
-      const panicBtn = document.getElementById('panicBtn');
-      const panicText = document.getElementById('panicText');
 
-      if (s.panicStop) {
-        panicBtn.classList.add('active');
-        panicText.textContent = 'OBNOVIT PROVOZ';
-        modeText.textContent = "PANIC STOP AKTIVNÍ";
-        modeDot.classList.add('off');
-        modeDot.classList.remove('test');
+      if (s.testMode) {
+        modeText.textContent = "Režim: TEST (MANUAL)";
+        modeDot.classList.add('test');
+        modeDot.classList.remove('off');
+        btnToggle.textContent = "Přepnout na AUTO";
       } else {
-        panicBtn.classList.remove('active');
-        panicText.textContent = 'PANIC STOP';
-        
-        if (s.testMode) {
-          modeText.textContent = "Režim: TEST (MANUAL)";
-          modeDot.classList.add('test');
-          modeDot.classList.remove('off');
-          btnToggle.textContent = "Přepnout na AUTO";
-        } else {
-          modeText.textContent = "Režim: AUTO";
-          modeDot.classList.remove('test');
-          modeDot.classList.remove('off');
-          btnToggle.textContent = "Přepnout na TEST";
-        }
+        modeText.textContent = "Režim: AUTO";
+        modeDot.classList.remove('test');
+        modeDot.classList.remove('off');
+        btnToggle.textContent = "Přepnout na TEST";
       }
 
       // Senzor / alarm stav
@@ -974,20 +714,19 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       document.getElementById('manCool').disabled       = disabled;
       document.getElementById('manFan').disabled        = disabled;
 
-      // ---- graf from ESP32 history ----
-      if (s.graphHistory && s.graphHistory.length > 0) {
-        labels.length = 0;
-        dataTemp.length = 0;
-        dataHum.length = 0;
-        
-        s.graphHistory.forEach(point => {
-          labels.push(point.timestamp + " s");
-          dataTemp.push(point.temp);
-          dataHum.push(point.humidity);
-        });
-        
-        chart.update();
+      // ---- graf ----
+      const label = (s.uptimeSec || 0) + " s";
+      labels.push(label);
+      dataTemp.push(s.temp);
+      dataHum.push(s.humidity);
+
+      if (labels.length > maxPoints) {
+        labels.shift();
+        dataTemp.shift();
+        dataHum.shift();
       }
+
+      chart.update();
 
       // ALARM bar
       const alarmBar = document.getElementById('alarmBar');
@@ -1000,44 +739,19 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         alarmBar.style.display = 'none';
       }
 
-      // Stav komory with color indicators
+      // Stav komory
       if (typeof s.temp !== "undefined") {
         document.getElementById('temp').textContent = s.temp.toFixed(2);
-      }
-      // Display T1/T2
-      if (typeof s.temp1 !== "undefined" && typeof s.temp2 !== "undefined") {
-        document.getElementById('temp12').textContent = `${s.temp1.toFixed(1)} / ${s.temp2.toFixed(1)}`;
       }
       if (typeof s.humidity !== "undefined") {
         document.getElementById('hum').textContent = s.humidity.toFixed(1);
       }
 
-      const heatEl = document.getElementById('heat');
-      heatEl.textContent = s.heaterOn ? "Zapnuto" : "Vypnuto";
-      if (s.heaterOn) {
-        heatEl.classList.add('heating');
-      } else {
-        heatEl.classList.remove('heating');
-      }
-
-      const humidifierEl = document.getElementById('humidifier');
-      humidifierEl.textContent = s.humidifierOn ? "Zapnuto" : "Vypnuto";
-      if (s.humidifierOn) {
-        humidifierEl.classList.add('humidifying');
-      } else {
-        humidifierEl.classList.remove('humidifying');
-      }
-
-      const coolEl = document.getElementById('cool');
-      coolEl.textContent = s.coolFanOn ? "Zapnuto" : "Vypnuto";
-      if (s.coolFanOn) {
-        coolEl.classList.add('cooling');
-      } else {
-        coolEl.classList.remove('cooling');
-      }
-
-      document.getElementById('fan').textContent = s.fanPercent ?? 0;
-      document.getElementById('uptime').textContent = s.uptimeSec ?? 0;
+      document.getElementById('heat').textContent        = s.heaterOn ? "Zapnuto" : "Vypnuto";
+      document.getElementById('humidifier').textContent  = s.humidifierOn ? "Zapnuto" : "Vypnuto";
+      document.getElementById('fan').textContent         = s.fanPercent ?? 0;
+      document.getElementById('cool').textContent        = s.coolFanOn ? "Zapnuto" : "Vypnuto";
+      document.getElementById('uptime').textContent      = s.uptimeSec ?? 0;
 
       // Kalibrace / hystereze
       if (typeof s.temp1Offset !== "undefined") {
@@ -1193,51 +907,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
   }
 
-  async function togglePanic() {
-    try {
-      const next = !(lastStatus?.panicStop);
-      const params = new URLSearchParams({ stop: next ? "1" : "0" });
-      const r = await fetch("/setPanic?" + params.toString());
-      if (r.ok) {
-        refresh();
-      } else {
-        alert("Chyba při nastavování PANIC STOP");
-      }
-    } catch (e) {
-      console.log("togglePanic error", e);
-    }
-  }
-
-  async function saveWifi() {
-    const ssid = document.getElementById('wifiSSID').value.trim();
-    const pass = document.getElementById('wifiPass').value.trim();
-
-    if (!ssid) {
-      alert("SSID nesmí být prázdné");
-      return;
-    }
-
-    if (!confirm(`Opravdu chcete změnit WiFi na "${ssid}"? ESP32 se restartuje.`)) {
-      return;
-    }
-
-    const params = new URLSearchParams({
-      ssid: ssid,
-      pass: pass
-    });
-
-    try {
-      const r = await fetch("/setWifi?" + params.toString());
-      if (r.ok) {
-        alert("WiFi credentials uloženy. ESP32 se restartuje...");
-      } else {
-        alert("Chyba při ukládání WiFi nastavení");
-      }
-    } catch (e) {
-      console.log("saveWifi error", e);
-    }
-  }
-
   window.addEventListener('load', () => {
     initProgramSelect();
     initChart();
@@ -1305,8 +974,6 @@ static void handleStatus() {
   json += "\"targetTemp\":" + String(p.targetTempC) + ",";
   json += "\"targetHumidity\":" + String(p.targetHumidity) + ",";
   json += "\"temp\":" + String(temp) + ",";
-  json += "\"temp1\":" + String(sensors.temp1) + ",";
-  json += "\"temp2\":" + String(sensors.temp2) + ",";
   json += "\"humidity\":" + String(hum) + ",";
   json += "\"heaterOn\":" + String(actuators.heaterOn ? 1 : 0) + ",";
   json += "\"humidifierOn\":" + String(actuators.humidifierOn ? 1 : 0) + ",";
@@ -1314,7 +981,6 @@ static void handleStatus() {
   json += "\"coolFanOn\":" + String(actuators.coolFanOn ? 1 : 0) + ",";
   json += "\"autoMode\":" + String(config.autoMode ? 1 : 0) + ",";
   json += "\"testMode\":" + String(testMode ? 1 : 0) + ",";
-  json += "\"panicStop\":" + String(panicStop ? 1 : 0) + ",";
   json += "\"uptimeSec\":" + String(up) + ",";
   json += "\"sensorTimeout\":" + String(sensorTimeout ? 1 : 0) + ",";
 
@@ -1346,26 +1012,9 @@ static void handleStatus() {
   const ProgramSettings &custom = programs[PROGRAM_CUSTOM];
   json += "\"customTemp\":" + String(custom.targetTempC, 2) + ",";
   json += "\"customHum\":"  + String(custom.targetHumidity, 2) + ",";
-  json += "\"customDur\":"  + String(custom.durationMin) + ",";
-
-  // Graph history from ESP32
-  json += "\"graphHistory\":[";
-  int start = (historyCount < MAX_HISTORY_POINTS) ? 0 : historyIndex;
-  for (int i = 0; i < historyCount; i++) {
-    int idx = (start + i) % MAX_HISTORY_POINTS;
-    if (i > 0) json += ",";
-    json += "{\"timestamp\":" + String(graphHistory[idx].timestamp) + ",";
-    json += "\"temp\":" + String(graphHistory[idx].temp, 2) + ",";
-    json += "\"humidity\":" + String(graphHistory[idx].humidity, 2) + "}";
-  }
-  json += "]";
+  json += "\"customDur\":"  + String(custom.durationMin);
 
   json += "}";
-
-  // Add current reading to history
-  if (!isnan(temp) && !isnan(hum)) {
-    addHistoryPoint(temp, hum);
-  }
 
   server.send(200, "application/json", json);
 }
@@ -1541,69 +1190,6 @@ static void handleSetManual() {
 }
 
 //------------------------------------------------------
-// PANIC STOP handler
-//------------------------------------------------------
-static void handleSetPanic() {
-  if (!server.hasArg("stop")) {
-    server.send(400, "text/plain", "Missing stop parameter");
-    return;
-  }
-
-  int stop = server.arg("stop").toInt();
-  panicStop = (stop != 0);
-
-  Serial.print("[webui] PANIC STOP set to ");
-  Serial.println(panicStop ? "ON" : "OFF");
-
-  if (panicStop) {
-    // Immediately turn off all actuators
-    actuators.heaterOn = false;
-    actuators.humidifierOn = false;
-    actuators.coolFanOn = false;
-    actuators.fanPercent = 0;
-  }
-
-  server.send(200, "text/plain", "OK");
-}
-
-//------------------------------------------------------
-// WiFi configuration handler
-//------------------------------------------------------
-static void handleSetWifi() {
-  if (!server.hasArg("ssid") || !server.hasArg("pass")) {
-    server.send(400, "text/plain", "Missing ssid or pass");
-    return;
-  }
-
-  String newSSID = server.arg("ssid");
-  String newPASS = server.arg("pass");
-
-  if (newSSID.length() == 0 || newSSID.length() > 32) {
-    server.send(400, "text/plain", "Invalid SSID length");
-    return;
-  }
-
-  if (newPASS.length() > 64) {
-    server.send(400, "text/plain", "Invalid password length");
-    return;
-  }
-
-  // Save to NVS
-  prefs.begin("fermentbox", false);
-  prefs.putString("wifiSSID", newSSID);
-  prefs.putString("wifiPASS", newPASS);
-  prefs.end();
-
-  Serial.print("[webui] WiFi credentials saved: SSID=");
-  Serial.println(newSSID);
-
-  server.send(200, "text/plain", "OK - Restarting...");
-
-  delay(500);
-  ESP.restart();
-}
-
-//------------------------------------------------------
 static void handleRoot() {
   server.send_P(200, "text/html", INDEX_HTML);
 }
@@ -1614,18 +1200,10 @@ static void handleNotFound() {
 
 //------------------------------------------------------
 void initWebUI() {
-  // Load WiFi credentials from NVS
-  prefs.begin("fermentbox", true);
-  wifiSSID = prefs.getString("wifiSSID", "Rehakovi");
-  wifiPASS = prefs.getString("wifiPASS", "123789Lucinka");
-  prefs.end();
-
   Serial.println("[webui] Connecting to home WiFi…");
-  Serial.print("[webui] SSID: ");
-  Serial.println(wifiSSID);
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSSID.c_str(), wifiPASS.c_str());
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   unsigned long startAttempt = millis();
   bool connected = false;
@@ -1664,8 +1242,6 @@ void initWebUI() {
   server.on("/setConfig", handleSetConfig);
   server.on("/setTestMode", handleSetTestMode);
   server.on("/setManual", handleSetManual);
-  server.on("/setPanic", handleSetPanic);
-  server.on("/setWifi", handleSetWifi);
   server.onNotFound(handleNotFound);
 
   server.begin();
