@@ -12,10 +12,11 @@ extern bool panicStop;
 
 //------------------------------------------------------
 //  WiFi credentials from NVS (Preferences)
+//  Default values - should be changed via web interface
 //------------------------------------------------------
 static Preferences prefs;
-static String wifiSSID = "Rehakovi";       // default
-static String wifiPASS = "123789Lucinka";  // default
+static String wifiSSID = "";       // Empty by default - will load from NVS
+static String wifiPASS = "";       // Empty by default - will load from NVS
 
 //------------------------------------------------------
 //  Fallback AP mód
@@ -60,7 +61,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <title>FermentorBox</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FermentorBox">
@@ -1569,6 +1570,8 @@ static void handleSetPanic() {
 //------------------------------------------------------
 // WiFi configuration handler
 //------------------------------------------------------
+static bool restartPending = false;
+
 static void handleSetWifi() {
   if (!server.hasArg("ssid") || !server.hasArg("pass")) {
     server.send(400, "text/plain", "Missing ssid or pass");
@@ -1579,12 +1582,17 @@ static void handleSetWifi() {
   String newPASS = server.arg("pass");
 
   if (newSSID.length() == 0 || newSSID.length() > 32) {
-    server.send(400, "text/plain", "Invalid SSID length");
+    server.send(400, "text/plain", "Invalid SSID length (1-32 chars)");
+    return;
+  }
+
+  if (newPASS.length() > 0 && newPASS.length() < 8) {
+    server.send(400, "text/plain", "Password must be at least 8 characters for WPA2");
     return;
   }
 
   if (newPASS.length() > 64) {
-    server.send(400, "text/plain", "Invalid password length");
+    server.send(400, "text/plain", "Invalid password length (max 64 chars)");
     return;
   }
 
@@ -1597,10 +1605,10 @@ static void handleSetWifi() {
   Serial.print("[webui] WiFi credentials saved: SSID=");
   Serial.println(newSSID);
 
-  server.send(200, "text/plain", "OK - Restarting...");
+  server.send(200, "text/plain", "OK - Will restart in 2 seconds");
 
-  delay(500);
-  ESP.restart();
+  // Set flag for main loop to handle restart
+  restartPending = true;
 }
 
 //------------------------------------------------------
@@ -1614,37 +1622,16 @@ static void handleNotFound() {
 
 //------------------------------------------------------
 void initWebUI() {
-  // Load WiFi credentials from NVS
+  // Load WiFi credentials from NVS (with fallback defaults)
   prefs.begin("fermentbox", true);
-  wifiSSID = prefs.getString("wifiSSID", "Rehakovi");
-  wifiPASS = prefs.getString("wifiPASS", "123789Lucinka");
+  wifiSSID = prefs.getString("wifiSSID", "");
+  wifiPASS = prefs.getString("wifiPASS", "");
   prefs.end();
 
-  Serial.println("[webui] Connecting to home WiFi…");
-  Serial.print("[webui] SSID: ");
-  Serial.println(wifiSSID);
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSSID.c_str(), wifiPASS.c_str());
-
-  unsigned long startAttempt = millis();
-  bool connected = false;
-
-  while (millis() - startAttempt < 8000UL) {
-    if (WiFi.status() == WL_CONNECTED) {
-      connected = true;
-      break;
-    }
-    delay(200);
-    Serial.print(".");
-  }
-  Serial.println();
-
-  if (connected) {
-    Serial.print("[webui] Connected. IP: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("[webui] Home WiFi failed, starting AP mode...");
+  // If no credentials saved, start in AP mode directly
+  if (wifiSSID.length() == 0) {
+    Serial.println("[webui] No WiFi credentials found in NVS");
+    Serial.println("[webui] Starting in AP mode...");
     WiFi.mode(WIFI_AP);
     bool apOk = WiFi.softAP(AP_SSID, AP_PASS);
     if (apOk) {
@@ -1654,6 +1641,43 @@ void initWebUI() {
       Serial.println(WiFi.softAPIP());
     } else {
       Serial.println("[webui] ERROR: AP start failed.");
+    }
+  } else {
+    Serial.println("[webui] Connecting to home WiFi…");
+    Serial.print("[webui] SSID: ");
+    Serial.println(wifiSSID);
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(wifiSSID.c_str(), wifiPASS.c_str());
+
+    unsigned long startAttempt = millis();
+    bool connected = false;
+
+    while (millis() - startAttempt < 8000UL) {
+      if (WiFi.status() == WL_CONNECTED) {
+        connected = true;
+        break;
+      }
+      delay(200);
+      Serial.print(".");
+    }
+    Serial.println();
+
+    if (connected) {
+      Serial.print("[webui] Connected. IP: ");
+      Serial.println(WiFi.localIP());
+    } else {
+      Serial.println("[webui] Home WiFi failed, starting AP mode...");
+      WiFi.mode(WIFI_AP);
+      bool apOk = WiFi.softAP(AP_SSID, AP_PASS);
+      if (apOk) {
+        Serial.print("[webui] AP started. SSID=");
+        Serial.print(AP_SSID);
+        Serial.print("  IP=");
+        Serial.println(WiFi.softAPIP());
+      } else {
+        Serial.println("[webui] ERROR: AP start failed.");
+      }
     }
   }
 
@@ -1674,5 +1698,18 @@ void initWebUI() {
 
 //------------------------------------------------------
 void handleWebUI() {
+  static uint32_t restartTimer = 0;
+  
   server.handleClient();
+  
+  // Handle pending restart (non-blocking)
+  if (restartPending) {
+    if (restartTimer == 0) {
+      restartTimer = millis();
+      Serial.println("[webui] Restart scheduled in 2 seconds...");
+    } else if (millis() - restartTimer > 2000) {
+      Serial.println("[webui] Restarting now...");
+      ESP.restart();
+    }
+  }
 }
