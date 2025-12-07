@@ -1,0 +1,1224 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WebServer.h>
+
+#include "config.h"
+#include "sensors.h"
+#include "control.h"
+
+//------------------------------------------------------
+//  Domácí WiFi – UPRAV PODLE SEBE
+//------------------------------------------------------
+static const char *WIFI_SSID = "Rehakovi";       // ← změň podle sebe
+static const char *WIFI_PASS = "123789Lucinka";  // ← změň podle sebe
+
+//------------------------------------------------------
+//  Fallback AP mód
+//------------------------------------------------------
+static const char *AP_SSID  = "FermentorBox";
+static const char *AP_PASS  = "fermentor123";
+
+//------------------------------------------------------
+static WebServer server(80);
+
+//------------------------------------------------------
+// HTML UI STRÁNKA – „luxusní“ verze
+//------------------------------------------------------
+const char INDEX_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>FermentorBox</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: #020617;
+    color: #e5e7eb;
+  }
+
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #111827;
+    background: radial-gradient(circle at top left, #1f2937 0, #020617 45%);
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.03em;
+  }
+
+  header .sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 2fr);
+    gap: 16px;
+    padding: 12px 16px 24px 16px;
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .card {
+    background: #020617;
+    border-radius: 14px;
+    border: 1px solid #111827;
+    padding: 12px 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+
+  .card h2 {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+  }
+
+  .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .main-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .sub {
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .pill {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:3px 8px;
+    border-radius:999px;
+    background:#111827;
+    border:1px solid #374151;
+    font-size:11px;
+    color:#e5e7eb;
+  }
+
+  .pill-dot {
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    background:#22c55e;
+  }
+
+  .pill-dot.off {
+    background:#ef4444;
+  }
+
+  .pill-dot.test {
+    background:#f97316;
+  }
+
+  .progress-container {
+    margin-top:6px;
+  }
+
+  .progress-bar {
+    width:100%;
+    height:6px;
+    background:#030712;
+    border-radius:999px;
+    overflow:hidden;
+    border:1px solid #111827;
+  }
+
+  .progress-fill {
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg, #22c55e, #eab308);
+    transition:width 0.3s ease;
+  }
+
+  .small {
+    font-size:11px;
+    color:#9ca3af;
+  }
+
+  .stat-grid {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+    margin-top:8px;
+  }
+
+  .stat {
+    background:#020617;
+    border-radius:10px;
+    border:1px solid #111827;
+    padding:6px 8px;
+  }
+
+  .stat-label {
+    font-size:11px;
+    color:#9ca3af;
+  }
+
+  .stat-value {
+    font-size:14px;
+    font-weight:500;
+  }
+
+  .stat-extra {
+    font-size:11px;
+    color:#6b7280;
+  }
+
+  .chart-wrapper {
+    margin-top:10px;
+  }
+
+  .chart-wrapper canvas {
+    width:100%;
+    height:220px;
+  }
+
+  .switch-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    margin:6px 0;
+  }
+
+  .custom-row {
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin:4px 0;
+  }
+
+  .custom-row label {
+    font-size:12px;
+    min-width:110px;
+    color:#9ca3af;
+  }
+
+  .custom-row input[type="number"],
+  .custom-row input[type="text"] {
+    flex:1;
+    padding:4px 6px;
+    border-radius:6px;
+    border:1px solid #374151;
+    background:#020617;
+    color:#e5e7eb;
+    font-size:13px;
+  }
+
+  .custom-row input[type="range"] {
+    flex:1;
+  }
+
+  button {
+    padding:5px 10px;
+    background:#0f766e;
+    border-radius:8px;
+    border:1px solid #0f766e;
+    color:#ecfeff;
+    font-size:13px;
+    cursor:pointer;
+  }
+
+  button.secondary {
+    background:#111827;
+    border-color:#374151;
+    color:#e5e7eb;
+  }
+
+  button:disabled {
+    opacity:0.5;
+    cursor:not-allowed;
+  }
+
+  .alarm-bar {
+    margin-top:8px;
+    padding:6px 8px;
+    border-radius:10px;
+    background:rgba(220,38,38,0.15);
+    border:1px solid rgba(248,113,113,0.6);
+    font-size:12px;
+    color:#fecaca;
+  }
+
+  .badge-ok {
+    font-size:11px;
+    padding:2px 6px;
+    border-radius:999px;
+    background:rgba(34,197,94,0.1);
+    border:1px solid rgba(34,197,94,0.6);
+    color:#bbf7d0;
+  }
+
+  .badge-warn {
+    font-size:11px;
+    padding:2px 6px;
+    border-radius:999px;
+    background:rgba(234,179,8,0.1);
+    border:1px solid rgba(234,179,8,0.6);
+    color:#fef9c3;
+  }
+
+  .badge-err {
+    font-size:11px;
+    padding:2px 6px;
+    border-radius:999px;
+    background:rgba(248,113,113,0.1);
+    border:1px solid rgba(248,113,113,0.6);
+    color:#fee2e2;
+  }
+
+  .section-title {
+    font-size:13px;
+    font-weight:500;
+    margin-top:4px;
+    margin-bottom:3px;
+  }
+
+  .hint {
+    font-size:11px;
+    color:#6b7280;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>FermentorBox</h1>
+    <div class="sub">Řízení kynutí – panettone, croissanty, chléb, lievito madre…</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEVÝ SLOUPEC: program, graf -->
+    <div>
+      <div class="card">
+        <div class="label">Aktivní program</div>
+        <div class="row" style="align-items:center; margin-bottom:6px;">
+          <div>
+            <div id="progName" class="main-title">Načítám…</div>
+            <div id="progDetail" class="sub">T … | V …</div>
+          </div>
+          <div id="modePill" class="pill">
+            <span class="pill-dot" id="modeDot"></span>
+            <span id="modeText">Režim: AUTO</span>
+          </div>
+        </div>
+
+        <div class="progress-container">
+          <div id="progTime" class="small">Čekám na data…</div>
+          <div class="progress-bar">
+            <div id="progProgressFill" class="progress-fill"></div>
+          </div>
+        </div>
+
+        <div class="custom-row" style="margin-top:10px;">
+          <label for="programSelect">Vybrat program:</label>
+          <select id="programSelect" style="flex:1; padding:4px 6px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb; font-size:13px;" onchange="onProgramSelectChange()">
+            <!-- options budou doplněny z JavaScriptu podle seznamu programů -->
+          </select>
+        </div>
+
+        <div style="margin-top:12px; border-top:1px solid #1f2937; padding-top:8px;">
+          <div class="label">Vlastní program</div>
+
+          <div class="custom-row">
+            <label for="customTemp">Teplota (°C):</label>
+            <input type="number" id="customTemp" step="0.1" min="5" max="40">
+          </div>
+          <div class="custom-row">
+            <label for="customHum">Vlhkost (%):</label>
+            <input type="number" id="customHum" step="1" min="0" max="100">
+          </div>
+          <div class="custom-row">
+            <label for="customDur">Délka (min):</label>
+            <input type="number" id="customDur" step="1" min="0" max="2880">
+          </div>
+          <div class="hint">
+            0 min = program bez omezení času. Hodnoty platí pro režim „Vlastní“.
+          </div>
+
+          <button style="margin-top:6px;" onclick="saveCustom()">Uložit Vlastní program</button>
+        </div>
+      </div>
+
+      <div class="card chart-wrapper">
+        <div class="label">Graf (posledních ~4–5 minut)</div>
+        <canvas id="chart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- PRAVÝ SLOUPEC: stav, kalibrace, TEST -->
+    <div>
+      <div class="card">
+        <div class="label">Stav komory</div>
+
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="stat-label">Teplota</div>
+            <div class="stat-value"><span id="temp">–</span> °C</div>
+            <div class="stat-extra">T1/T2: <span id="temp12">– / –</span> °C</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Vlhkost</div>
+            <div class="stat-value"><span id="hum">–</span> %</div>
+            <div class="stat-extra">Senzor: DHT22</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Topení</div>
+            <div class="stat-value" id="heat">–</div>
+            <div class="stat-extra">PTC / relé</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Zvlhčování</div>
+            <div class="stat-value" id="humidifier">–</div>
+            <div class="stat-extra">Ultrazvuk / mlhováč</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Vnitřní ventilátor</div>
+            <div class="stat-value"><span id="fan">0</span> %</div>
+            <div class="stat-extra">PWM řízení</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Chlazení</div>
+            <div class="stat-value" id="cool">–</div>
+            <div class="stat-extra">externí ventilátor</div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;" class="small">
+          Uptime: <span id="uptime">0</span> s
+        </div>
+
+        <div id="sensorStatus" style="margin-top:4px;" class="small">
+          Senzory: <span class="badge-ok">OK</span>
+        </div>
+
+        <div id="alarmBar" class="alarm-bar" style="display:none;">
+          <div id="alarmText">Blízké překročení bezpečnostních limitů.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <div class="label">Režim a TEST</div>
+
+        <div class="switch-row">
+          <span class="small">Režim regulace</span>
+          <button id="btnToggleTest" class="secondary" onclick="toggleTestMode()">Přepnout na TEST</button>
+        </div>
+        <div class="hint">
+          AUTO = regulace podle programu. TEST = ruční ovládání (pro servis / test).
+        </div>
+
+        <div class="section-title">Manuální ovládání (TEST)</div>
+
+        <div class="custom-row">
+          <label><input type="checkbox" id="manHeater">Topení</label>
+          <label><input type="checkbox" id="manHumidifier">Zvlhčování</label>
+        </div>
+        <div class="custom-row">
+          <label><input type="checkbox" id="manCool">Chlazení</label>
+        </div>
+        <div class="custom-row">
+          <label for="manFan">Ventilátor:</label>
+          <input type="range" id="manFan" min="0" max="100" step="5" value="0"
+                 oninput="document.getElementById('manFanVal').textContent = this.value;">
+          <span id="manFanVal">0</span> %
+        </div>
+
+        <div class="hint">
+          Manuální ovládání funguje jen v TEST režimu. V AUTO režimu je jen pro náhled.
+        </div>
+
+        <button style="margin-top:8px;" onclick="applyManual()">Použít manuální nastavení</button>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <div class="label">Kalibrace a nastavení</div>
+
+        <div class="custom-row">
+          <label for="cfgTemp1Off">Offset T1 (°C):</label>
+          <input type="number" id="cfgTemp1Off" step="0.1">
+        </div>
+        <div class="custom-row">
+          <label for="cfgTemp2Off">Offset T2 (°C):</label>
+          <input type="number" id="cfgTemp2Off" step="0.1">
+        </div>
+        <div class="custom-row">
+          <label for="cfgHumOff">Offset vlhkosti (%):</label>
+          <input type="number" id="cfgHumOff" step="0.1">
+        </div>
+        <div class="custom-row">
+          <label for="cfgTempHyst">Hystereze T (°C):</label>
+          <input type="number" id="cfgTempHyst" step="0.1">
+        </div>
+        <div class="custom-row">
+          <label for="cfgHumHyst">Hystereze V (%):</label>
+          <input type="number" id="cfgHumHyst" step="0.1">
+        </div>
+
+        <div class="hint">
+          Hodnoty se ukládají do NVS (trvalá paměť ESP32).
+        </div>
+
+        <button style="margin-top:8px;" onclick="saveConfig()">Uložit kalibraci</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let lastStatus = null;
+  let chart = null;
+  const labels = [];
+  const dataTemp = [];
+  const dataHum = [];
+  const maxPoints = 120;
+
+  // Názvy programů podle pořadí v poli programs[] (viz config.cpp)
+  const programNames = [
+    "Panettone - těsto",
+    "Panettone - ve formě",
+    "Croissant - těsto",
+    "Croissant - kynutí",
+    "Chleba - bulk (teplý)",
+    "Chleba - bulk (lednice)",
+    "Chleba - ve formě",
+    "LM - aktivace",
+    "LM - spánek (chlazení)",
+    "Vlastní"
+  ];
+
+  function initProgramSelect() {
+    const sel = document.getElementById('programSelect');
+    if (!sel) return;
+    sel.innerHTML = "";
+    programNames.forEach((name, idx) => {
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+  }
+
+  function onProgramSelectChange() {
+    const sel = document.getElementById('programSelect');
+    if (!sel) return;
+    const id = parseInt(sel.value);
+    if (!isNaN(id)) {
+      setProgram(id);
+    }
+  }
+
+  function initChart() {
+    const ctx = document.getElementById('chart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Teplota (°C)',
+            data: dataTemp,
+            tension: 0.25,
+            borderWidth: 2,
+            yAxisID: 'tempAxis',
+          },
+          {
+            label: 'Vlhkost (%)',
+            data: dataHum,
+            tension: 0.25,
+            borderWidth: 2,
+            yAxisID: 'humAxis',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: { color: '#9ca3af', maxTicksLimit: 6 },
+            grid: { display: false }
+          },
+          tempAxis: {
+            type: 'linear',
+            position: 'left',
+            suggestedMin: 15,
+            suggestedMax: 40,
+            ticks: { color: '#facc15' },
+            grid: { color: 'rgba(55,65,81,0.4)' }
+          },
+          humAxis: {
+            type: 'linear',
+            position: 'right',
+            min: 0,
+            max: 100,
+            ticks: { color: '#60a5fa' },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: { color: '#e5e7eb', font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch('/api/status');
+      if (!r.ok) return;
+      const s = await r.json();
+      lastStatus = s;
+
+      // Aktivní program + detail
+      document.getElementById('progName').textContent = s.programName || 'Neznámý';
+
+      let detail = `Cíl: T=${(s.targetTemp ?? 0).toFixed(1)} °C, V=${(s.targetHumidity ?? 0).toFixed(0)} %`;
+      document.getElementById('progDetail').textContent = detail;
+
+      // nastavit výběr programu podle programId
+      const progSel = document.getElementById('programSelect');
+      if (progSel && typeof s.programId !== "undefined") {
+        const val = String(s.programId);
+        if (progSel.value !== val) {
+          progSel.value = val;
+        }
+      }
+
+      // Progress bar a čas
+      const elapsed = s.elapsedMin ?? 0;
+      const dur = s.durationMin ?? 0;
+      const rem = s.remainingMin ?? 0;
+      let timeText = '';
+
+      if (dur > 0) {
+        timeText = `Uplynulo ${elapsed.toFixed(1)} min, zbývá ${rem.toFixed(1)} min z ${dur.toFixed(1)} min.`;
+      } else {
+        timeText = `Program bez omezení času, běží ${elapsed.toFixed(1)} min.`;
+      }
+      document.getElementById('progTime').textContent = timeText;
+
+      const progFill = document.getElementById('progProgressFill');
+      let progress = s.progress ?? 0;
+      if (progress < 0) progress = 0;
+      if (progress > 100) progress = 100;
+      progFill.style.width = progress + '%';
+
+      // Režim (AUTO / TEST)
+      const modePill = document.getElementById('modePill');
+      const modeDot  = document.getElementById('modeDot');
+      const modeText = document.getElementById('modeText');
+      const btnToggle = document.getElementById('btnToggleTest');
+
+      if (s.testMode) {
+        modeText.textContent = "Režim: TEST (MANUAL)";
+        modeDot.classList.add('test');
+        modeDot.classList.remove('off');
+        btnToggle.textContent = "Přepnout na AUTO";
+      } else {
+        modeText.textContent = "Režim: AUTO";
+        modeDot.classList.remove('test');
+        modeDot.classList.remove('off');
+        btnToggle.textContent = "Přepnout na TEST";
+      }
+
+      // Senzor / alarm stav
+      const sensorStatus = document.getElementById('sensorStatus');
+      if (s.sensorTimeout) {
+        sensorStatus.innerHTML = 'Senzory: <span class="badge-err">Chyba / timeout</span>';
+      } else if (s.sensorWarning) {
+        sensorStatus.innerHTML = 'Senzory: <span class="badge-warn">Pozor (hraniční hodnoty)</span>';
+      } else {
+        sensorStatus.innerHTML = 'Senzory: <span class="badge-ok">OK</span>';
+      }
+
+      // Zapínání / vypínání manuálních prvků podle testMode
+      const disabled = !s.testMode;
+      document.getElementById('manHeater').disabled      = disabled;
+      document.getElementById('manHumidifier').disabled  = disabled;
+      document.getElementById('manCool').disabled       = disabled;
+      document.getElementById('manFan').disabled        = disabled;
+
+      // ---- graf ----
+      const label = (s.uptimeSec || 0) + " s";
+      labels.push(label);
+      dataTemp.push(s.temp);
+      dataHum.push(s.humidity);
+
+      if (labels.length > maxPoints) {
+        labels.shift();
+        dataTemp.shift();
+        dataHum.shift();
+      }
+
+      chart.update();
+
+      // ALARM bar
+      const alarmBar = document.getElementById('alarmBar');
+      const alarmText = document.getElementById('alarmText');
+
+      if (s.alarmActive) {
+        alarmBar.style.display = 'block';
+        alarmText.textContent = s.alarmMessage || "Blízké překročení bezpečnostních limitů.";
+      } else {
+        alarmBar.style.display = 'none';
+      }
+
+      // Stav komory
+      if (typeof s.temp !== "undefined") {
+        document.getElementById('temp').textContent = s.temp.toFixed(2);
+      }
+      if (typeof s.humidity !== "undefined") {
+        document.getElementById('hum').textContent = s.humidity.toFixed(1);
+      }
+
+      document.getElementById('heat').textContent        = s.heaterOn ? "Zapnuto" : "Vypnuto";
+      document.getElementById('humidifier').textContent  = s.humidifierOn ? "Zapnuto" : "Vypnuto";
+      document.getElementById('fan').textContent         = s.fanPercent ?? 0;
+      document.getElementById('cool').textContent        = s.coolFanOn ? "Zapnuto" : "Vypnuto";
+      document.getElementById('uptime').textContent      = s.uptimeSec ?? 0;
+
+      // Kalibrace / hystereze
+      if (typeof s.temp1Offset !== "undefined") {
+        document.getElementById('cfgTemp1Off').value = s.temp1Offset.toFixed(2);
+      }
+      if (typeof s.temp2Offset !== "undefined") {
+        document.getElementById('cfgTemp2Off').value = s.temp2Offset.toFixed(2);
+      }
+      if (typeof s.humOffset !== "undefined") {
+        document.getElementById('cfgHumOff').value = s.humOffset.toFixed(2);
+      }
+      if (typeof s.tempHyst !== "undefined") {
+        document.getElementById('cfgTempHyst').value = s.tempHyst.toFixed(2);
+      }
+      if (typeof s.humHyst !== "undefined") {
+        document.getElementById('cfgHumHyst').value = s.humHyst.toFixed(2);
+      }
+
+      // Vlastní program
+      if (typeof s.customTemp !== "undefined") {
+        document.getElementById('customTemp').value = s.customTemp.toFixed(1);
+      }
+      if (typeof s.customHum !== "undefined") {
+        document.getElementById('customHum').value = s.customHum.toFixed(0);
+      }
+      if (typeof s.customDur !== "undefined") {
+        document.getElementById('customDur').value = s.customDur;
+      }
+
+      // Manuální oblast – předvyplnit podle aktuálních stavů
+      document.getElementById('manHeater').checked      = !!s.heaterOn;
+      document.getElementById('manHumidifier').checked  = !!s.humidifierOn;
+      document.getElementById('manCool').checked        = !!s.coolFanOn;
+      document.getElementById('manFan').value           = s.fanPercent ?? 0;
+      document.getElementById('manFanVal').textContent  = s.fanPercent ?? 0;
+    } catch (e) {
+      console.log("refresh error", e);
+    }
+  }
+
+  async function setProgram(id) {
+    try {
+      await fetch("/setProgram?id=" + id);
+      refresh();
+    } catch (e) {
+      console.log("setProgram error", e);
+    }
+  }
+
+  async function saveCustom() {
+    const t = parseFloat(document.getElementById('customTemp').value);
+    const h = parseFloat(document.getElementById('customHum').value);
+    const d = parseInt(document.getElementById('customDur').value || "0", 10);
+
+    if (isNaN(t) || isNaN(h) || isNaN(d)) {
+      alert("Zadání obsahuje neplatné hodnoty.");
+      return;
+    }
+
+    const params = new URLSearchParams({
+      temp: t.toString(),
+      hum:  h.toString(),
+      dur:  d.toString()
+    });
+
+    try {
+      const r = await fetch("/setCustom?" + params.toString());
+      if (r.ok) {
+        // Vlastní program je PROGRAM_CUSTOM = index 9
+        await setProgram(9);
+      } else {
+        alert("Chyba při ukládání vlastního programu");
+      }
+    } catch (e) {
+      console.log("saveCustom error", e);
+    }
+  }
+
+  async function saveConfig() {
+    const t1 = parseFloat(document.getElementById('cfgTemp1Off').value || "0");
+    const t2 = parseFloat(document.getElementById('cfgTemp2Off').value || "0");
+    const ho = parseFloat(document.getElementById('cfgHumOff').value  || "0");
+    const th = parseFloat(document.getElementById('cfgTempHyst').value || "0.5");
+    const hh = parseFloat(document.getElementById('cfgHumHyst').value  || "3.0");
+
+    if (isNaN(t1) || isNaN(t2) || isNaN(ho) || isNaN(th) || isNaN(hh)) {
+      alert("Zadání obsahuje neplatné hodnoty.");
+      return;
+    }
+
+    const params = new URLSearchParams({
+      t1off: t1.toString(),
+      t2off: t2.toString(),
+      hoff:  ho.toString(),
+      thyst: th.toString(),
+      hhyst: hh.toString()
+    });
+
+    try {
+      const r = await fetch("/setConfig?" + params.toString());
+      if (!r.ok) {
+        alert("Chyba při ukládání nastavení");
+      }
+    } catch (e) {
+      console.log("saveConfig error", e);
+    }
+  }
+
+  async function toggleTestMode() {
+    try {
+      const next = !(lastStatus?.testMode);
+      const params = new URLSearchParams({ mode: next ? "1" : "0" });
+      await fetch("/setTestMode?" + params.toString());
+      refresh();
+    } catch (e) {
+      console.log("toggleTestMode error", e);
+    }
+  }
+
+  async function applyManual() {
+    if (!lastStatus?.testMode) {
+      alert("Manuální ovládání funguje jen v TEST režimu.");
+      return;
+    }
+
+    const heater = document.getElementById('manHeater').checked ? 1 : 0;
+    const humid  = document.getElementById('manHumidifier').checked ? 1 : 0;
+    const cool   = document.getElementById('manCool').checked ? 1 : 0;
+    let fan      = parseInt(document.getElementById('manFan').value || "0", 10);
+
+    if (fan < 0) fan = 0;
+    if (fan > 100) fan = 100;
+
+    // malá logika – pokud není 0, držet aspoň 30 %, aby se ventilátor netrápil
+    if (fan > 0 && fan < 30) fan = 30;
+
+    const params = new URLSearchParams({
+      heater: heater.toString(),
+      humidifier: humid.toString(),
+      cool: cool.toString(),
+      fan: fan.toString()
+    });
+
+    try {
+      const r = await fetch("/setManual?" + params.toString());
+      if (!r.ok) {
+        alert("Chyba při odesílání manuálního ovládání");
+      } else {
+        refresh();
+      }
+    } catch (e) {
+      console.log("applyManual error", e);
+    }
+  }
+
+  window.addEventListener('load', () => {
+    initProgramSelect();
+    initChart();
+    refresh();
+    setInterval(refresh, 2000);
+  });
+</script>
+
+</body>
+</html>
+)rawliteral";
+
+//------------------------------------------------------
+// JSON API – status
+//------------------------------------------------------
+static void handleStatus() {
+  const ProgramSettings &p = getActiveProgram();
+
+  float temp = (sensors.temp1 + sensors.temp2) * 0.5f;
+  float hum  = sensors.humidity;
+  uint32_t up = millis() / 1000;
+
+  // Stejné timeouty jako v control.cpp
+  const uint32_t SENSOR_TIMEOUT_MS = 8000UL;
+  const float    MAX_TEMP          = 50.0f;
+  const float    MAX_HUMIDITY      = 98.0f;
+
+  uint32_t now = millis();
+  bool sensorTimeout = (now - sensors.lastUpdateMs > SENSOR_TIMEOUT_MS);
+
+  bool alarmActive = false;
+  String alarmMessage;
+
+  if (sensorTimeout) {
+    alarmActive = true;
+    alarmMessage = "Senzory neodpovídají (timeout). Zkontroluj DHT / kabeláž.";
+  } else {
+    if (temp > MAX_TEMP - 5.0f) {
+      alarmActive = true;
+      alarmMessage = "Teplota je blízko bezpečnostního maxima!";
+    } else if (hum > MAX_HUMIDITY - 3.0f) {
+      alarmActive = true;
+      alarmMessage = "Vlhkost je blízko bezpečnostního maxima!";
+    }
+  }
+
+  // Čas a progress programu
+  float elapsedMin   = controlState.elapsedMinutes;
+  float durationMin  = p.durationMin;
+  float remainingMin = -1.0f;
+  int   progress     = 0;
+
+  if (durationMin > 0.0f) {
+    remainingMin = durationMin - elapsedMin;
+    if (remainingMin < 0.0f) remainingMin = 0.0f;
+    float ratio = (float)elapsedMin / (float)durationMin;
+    if (ratio < 0.0f) ratio = 0.0f;
+    if (ratio > 1.0f) ratio = 1.0f;
+    progress = (int)(ratio * 100.0f + 0.5f);
+  }
+
+  String json = "{";
+  json += "\"programId\":" + String((int)currentProgram) + ",";
+  json += "\"programName\":\"" + String(p.name) + "\",";
+  json += "\"targetTemp\":" + String(p.targetTempC) + ",";
+  json += "\"targetHumidity\":" + String(p.targetHumidity) + ",";
+  json += "\"temp\":" + String(temp) + ",";
+  json += "\"humidity\":" + String(hum) + ",";
+  json += "\"heaterOn\":" + String(actuators.heaterOn ? 1 : 0) + ",";
+  json += "\"humidifierOn\":" + String(actuators.humidifierOn ? 1 : 0) + ",";
+  json += "\"fanPercent\":" + String((int)actuators.fanPercent) + ",";
+  json += "\"coolFanOn\":" + String(actuators.coolFanOn ? 1 : 0) + ",";
+  json += "\"autoMode\":" + String(config.autoMode ? 1 : 0) + ",";
+  json += "\"testMode\":" + String(testMode ? 1 : 0) + ",";
+  json += "\"uptimeSec\":" + String(up) + ",";
+  json += "\"sensorTimeout\":" + String(sensorTimeout ? 1 : 0) + ",";
+
+  // zjednodušený příznak "sensorWarning"
+  bool sensorWarning = false;
+  if (!sensorTimeout) {
+    if (temp > MAX_TEMP - 10.0f || hum > MAX_HUMIDITY - 10.0f) {
+      sensorWarning = true;
+    }
+  }
+  json += "\"sensorWarning\":" + String(sensorWarning ? 1 : 0) + ",";
+
+  json += "\"alarmActive\":" + String(alarmActive ? 1 : 0) + ",";
+  json += "\"alarmMessage\":\"" + alarmMessage + "\",";
+
+  json += "\"elapsedMin\":"   + String(elapsedMin, 2) + ",";
+  json += "\"durationMin\":"  + String(durationMin, 2) + ",";
+  json += "\"remainingMin\":" + String(remainingMin, 2) + ",";
+  json += "\"progress\":"     + String(progress) + ",";
+
+  // Kalibrace a hystereze
+  json += "\"temp1Offset\":" + String(config.temp1Offset, 3) + ",";
+  json += "\"temp2Offset\":" + String(config.temp2Offset, 3) + ",";
+  json += "\"humOffset\":"   + String(config.humOffset, 3) + ",";
+  json += "\"tempHyst\":"    + String(config.tempHyst, 3) + ",";
+  json += "\"humHyst\":"     + String(config.humHyst, 3) + ",";
+
+  // Vlastní program
+  const ProgramSettings &custom = programs[PROGRAM_CUSTOM];
+  json += "\"customTemp\":" + String(custom.targetTempC, 2) + ",";
+  json += "\"customHum\":"  + String(custom.targetHumidity, 2) + ",";
+  json += "\"customDur\":"  + String(custom.durationMin);
+
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+//------------------------------------------------------
+// Nastavení programu
+//------------------------------------------------------
+static void handleSetProgram() {
+  if (!server.hasArg("id")) {
+    server.send(400, "text/plain", "Missing id");
+    return;
+  }
+
+  int id = server.arg("id").toInt();
+  if (id < 0 || id >= PROGRAM_COUNT) {
+    server.send(400, "text/plain", "Invalid id");
+    return;
+  }
+
+  setProgram((FermentationProgram)id);
+  server.send(200, "text/plain", "OK");
+}
+
+//------------------------------------------------------
+// Nastavení vlastního programu
+//------------------------------------------------------
+static void handleSetCustom() {
+  if (!server.hasArg("temp") || !server.hasArg("hum") || !server.hasArg("dur")) {
+    server.send(400, "text/plain", "Missing params");
+    return;
+  }
+
+  float temp = server.arg("temp").toFloat();
+  float hum  = server.arg("hum").toFloat();
+  int   dur  = server.arg("dur").toInt();
+
+  if (temp < 5.0f)  temp = 5.0f;
+  if (temp > 40.0f) temp = 40.0f;
+  if (hum  < 0.0f)  hum  = 0.0f;
+  if (hum  > 100.0f) hum = 100.0f;
+  if (dur  < 0) dur = 0;
+  if (dur  > 2880) dur = 2880;
+
+  ProgramSettings &custom = programs[PROGRAM_CUSTOM];
+  custom.targetTempC    = temp;
+  custom.targetHumidity = hum;
+  custom.durationMin    = (uint16_t)dur;
+
+  Serial.print("[webui] Custom program updated: T=");
+  Serial.print(temp);
+  Serial.print(" H=");
+  Serial.print(hum);
+  Serial.print(" dur=");
+  Serial.println(dur);
+
+  // Uložíme i do NVS (část custom v saveConfig)
+  saveConfig();
+
+  server.send(200, "text/plain", "OK");
+}
+
+//------------------------------------------------------
+// Nastavení kalibrace a hystereze
+//------------------------------------------------------
+static void handleSetConfig() {
+  if (!server.hasArg("t1off") ||
+      !server.hasArg("t2off") ||
+      !server.hasArg("hoff")  ||
+      !server.hasArg("thyst") ||
+      !server.hasArg("hhyst")) {
+    server.send(400, "text/plain", "Missing params");
+    return;
+  }
+
+  float t1off = server.arg("t1off").toFloat();
+  float t2off = server.arg("t2off").toFloat();
+  float hoff  = server.arg("hoff").toFloat();
+  float thyst = server.arg("thyst").toFloat();
+  float hhyst = server.arg("hhyst").toFloat();
+
+  // Nějaké rozumné limity
+  if (t1off < -20.0f) t1off = -20.0f;
+  if (t1off >  20.0f) t1off =  20.0f;
+  if (t2off < -20.0f) t2off = -20.0f;
+  if (t2off >  20.0f) t2off =  20.0f;
+  if (hoff  < -20.0f) hoff  = -20.0f;
+  if (hoff  >  20.0f) hoff  =  20.0f;
+
+  if (thyst < 0.1f) thyst = 0.1f;
+  if (thyst > 10.0f) thyst = 10.0f;
+  if (hhyst < 0.1f) hhyst = 0.1f;
+  if (hhyst > 20.0f) hhyst = 20.0f;
+
+  config.temp1Offset = t1off;
+  config.temp2Offset = t2off;
+  config.humOffset   = hoff;
+  config.tempHyst    = thyst;
+  config.humHyst     = hhyst;
+
+  Serial.print("[webui] Config updated: t1Off=");
+  Serial.print(t1off);
+  Serial.print(" t2Off=");
+  Serial.print(t2off);
+  Serial.print(" hOff=");
+  Serial.print(hoff);
+  Serial.print(" tHyst=");
+  Serial.print(thyst);
+  Serial.print(" hHyst=");
+  Serial.println(hhyst);
+
+  saveConfig();
+
+  server.send(200, "text/plain", "OK");
+}
+
+//------------------------------------------------------
+// Přepnutí TEST módu z webu
+//------------------------------------------------------
+static void handleSetTestMode() {
+  if (!server.hasArg("mode")) {
+    server.send(400, "text/plain", "Missing mode");
+    return;
+  }
+
+  int mode = server.arg("mode").toInt();
+  testMode = (mode != 0);
+
+  Serial.print("[webui] TEST mode set to ");
+  Serial.println(testMode ? "ON" : "OFF");
+
+  server.send(200, "text/plain", "OK");
+}
+
+//------------------------------------------------------
+// Manuální ovládání v TEST módu
+//------------------------------------------------------
+static void handleSetManual() {
+  if (!testMode) {
+    server.send(400, "text/plain", "Not in test mode");
+    return;
+  }
+
+  if (server.hasArg("heater")) {
+    int v = server.arg("heater").toInt();
+    actuators.heaterOn = (v != 0);
+  }
+  if (server.hasArg("humidifier")) {
+    int v = server.arg("humidifier").toInt();
+    actuators.humidifierOn = (v != 0);
+  }
+  if (server.hasArg("cool")) {
+    int v = server.arg("cool").toInt();
+    actuators.coolFanOn = (v != 0);
+  }
+  if (server.hasArg("fan")) {
+    int v = server.arg("fan").toInt();
+    if (v < 0) v = 0;
+    if (v > 100) v = 100;
+    actuators.fanPercent = (uint8_t)v;
+  }
+
+  Serial.print("[webui] Manual set: HEAT=");
+  Serial.print(actuators.heaterOn ? "ON" : "OFF");
+  Serial.print(" HUMID=");
+  Serial.print(actuators.humidifierOn ? "ON" : "OFF");
+  Serial.print(" COOL=");
+  Serial.print(actuators.coolFanOn ? "ON" : "OFF");
+  Serial.print(" FAN=");
+  Serial.print(actuators.fanPercent);
+  Serial.println("%");
+
+  server.send(200, "text/plain", "OK");
+}
+
+//------------------------------------------------------
+static void handleRoot() {
+  server.send_P(200, "text/html", INDEX_HTML);
+}
+
+static void handleNotFound() {
+  server.send(404, "text/plain", "Not found");
+}
+
+//------------------------------------------------------
+void initWebUI() {
+  Serial.println("[webui] Connecting to home WiFi…");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+  unsigned long startAttempt = millis();
+  bool connected = false;
+
+  while (millis() - startAttempt < 8000UL) {
+    if (WiFi.status() == WL_CONNECTED) {
+      connected = true;
+      break;
+    }
+    delay(200);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (connected) {
+    Serial.print("[webui] Connected. IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("[webui] Home WiFi failed, starting AP mode...");
+    WiFi.mode(WIFI_AP);
+    bool apOk = WiFi.softAP(AP_SSID, AP_PASS);
+    if (apOk) {
+      Serial.print("[webui] AP started. SSID=");
+      Serial.print(AP_SSID);
+      Serial.print("  IP=");
+      Serial.println(WiFi.softAPIP());
+    } else {
+      Serial.println("[webui] ERROR: AP start failed.");
+    }
+  }
+
+  server.on("/", handleRoot);
+  server.on("/api/status", handleStatus);
+  server.on("/setProgram", handleSetProgram);
+  server.on("/setCustom", handleSetCustom);
+  server.on("/setConfig", handleSetConfig);
+  server.on("/setTestMode", handleSetTestMode);
+  server.on("/setManual", handleSetManual);
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+  Serial.println("[webui] Server started");
+}
+
+//------------------------------------------------------
+void handleWebUI() {
+  server.handleClient();
+}
