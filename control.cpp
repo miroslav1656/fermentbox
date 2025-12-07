@@ -13,10 +13,19 @@ ControlRuntimeState controlState;
 // interní časovač pro výpočet elapsedMinutes
 static uint32_t lastControlUpdateMs = 0;
 
-// "GLOBAL" bezpečnostní limity pro všechny režimy (AUTO i TEST)
-static const uint32_t GLOBAL_SENSOR_TIMEOUT_MS = 8000UL;  // 8 s bez nových dat
-static const float    GLOBAL_MAX_TEMP          = 50.0f;   // °C
-static const float    GLOBAL_MAX_HUMIDITY      = 98.0f;   // %
+// Globální bezpečnostní limity pro všechny režimy (AUTO i TEST)
+static const float    MAX_TEMP          = 50.0f;   // absolutní strop, nouzové vypnutí
+static const float    MAX_HUMIDITY      = 98.0f;   // extrémní vlhkost (kondenzace)
+static const uint32_t SENSOR_TIMEOUT_MS = 8000UL;  // pokud se senzor neaktualizuje 8 s
+
+// Anti-cycling ochrana – minimální doba mezi přepnutím stavu
+static uint32_t lastHeaterChangeMs = 0;
+static uint32_t lastHumidifierChangeMs = 0;
+static bool lastHeaterState = false;
+static bool lastHumidifierState = false;
+
+static const uint32_t HEATER_MIN_CYCLE_MS = 30000;      // 30s minimální čas mezi změnami topení
+static const uint32_t HUMIDIFIER_MIN_CYCLE_MS = 15000;  // 15s minimální čas mezi změnami zvlhčovače
 
 // Funkce, která hlídá extrémní stavy a případně přepíše actuators
 void applyGlobalSafety() {
@@ -31,7 +40,7 @@ void applyGlobalSafety() {
   else if (!isnan(t1))               avgT = t1;
   else if (!isnan(t2))               avgT = t2;
 
-  bool sensorTimeout = (now - sensors.lastUpdateMs > GLOBAL_SENSOR_TIMEOUT_MS);
+  bool sensorTimeout = (now - sensors.lastUpdateMs > SENSOR_TIMEOUT_MS);
 
   // Kritický stav – senzory neaktualizují, nebo nesmyslné hodnoty
   if (sensorTimeout || isnan(avgT) || isnan(hum)) {
@@ -43,14 +52,14 @@ void applyGlobalSafety() {
   }
 
   // Příliš vysoká teplota – vynutit chlazení
-  if (avgT > GLOBAL_MAX_TEMP) {
+  if (avgT > MAX_TEMP) {
     actuators.heaterOn   = false;
     actuators.coolFanOn  = true;
     actuators.fanPercent = 100;
   }
 
   // Příliš vysoká vlhkost – nikdy nedovolit zapnutý zvlhčovač
-  if (hum > GLOBAL_MAX_HUMIDITY) {
+  if (hum > MAX_HUMIDITY) {
     actuators.humidifierOn = false;
   }
 }
@@ -75,10 +84,6 @@ void initControl() {
 // FAIL-SAFE OCHRANY
 // ----------------------------------------------------------
 
-static const float    MAX_TEMP          = 50.0f;   // absolutní strop, nouzové vypnutí
-static const float    MAX_HUMIDITY      = 98.0f;   // extrémní vlhkost (kondenzace)
-static const uint32_t SENSOR_TIMEOUT_MS = 8000UL;  // pokud se senzor neaktualizuje 8 s
-
 static void failSafeMessage(const char *msg) {
   Serial.print("[FAIL-SAFE] ");
   Serial.println(msg);
@@ -90,9 +95,16 @@ static void failSafeMessage(const char *msg) {
 void updateControl() {
   const ProgramSettings &prog = getActiveProgram();
 
-  // Teplota a vlhkost z čidel
-  float avgTemp = (sensors.temp1 + sensors.temp2) * 0.5f;  // zatím průměr
-  float hum     = sensors.humidity;
+  // Bezpečné průměrování teploty s fallback na jednotlivá čidla
+  float avgTemp = NAN;
+  if (!isnan(sensors.temp1) && !isnan(sensors.temp2)) {
+    avgTemp = (sensors.temp1 + sensors.temp2) * 0.5f;
+  } else if (!isnan(sensors.temp1)) {
+    avgTemp = sensors.temp1;
+  } else if (!isnan(sensors.temp2)) {
+    avgTemp = sensors.temp2;
+  }
+  float hum = sensors.humidity;
 
   float tempHyst = config.tempHyst;
   float humHyst  = config.humHyst;
@@ -130,32 +142,60 @@ void updateControl() {
 
   // ---------- TOPENÍ vs CHLAZENÍ (normální logika) ----------
 
+  bool desiredHeaterState = actuators.heaterOn;
+
   // 1) Pokud je MOC ZIMA -> topíme, nechladíme
   if (avgTemp < prog.targetTempC - tempHyst) {
-    actuators.heaterOn  = true;
+    desiredHeaterState  = true;
     actuators.coolFanOn = false;
   }
   // 2) Pokud jsme v pásmu OK -> netopíme, nechladíme studeným vzduchem
   else if (avgTemp >= prog.targetTempC - tempHyst &&
            avgTemp <= prog.targetTempC + tempHyst) {
-    actuators.heaterOn  = false;
+    desiredHeaterState  = false;
     actuators.coolFanOn = false;
   }
   // 3) Pokud je MOC TEPLÁ KOMORA -> chladíme studeným vzduchem z garáže
   else if (avgTemp > prog.targetTempC + tempHyst) {
-    actuators.heaterOn  = false;
+    desiredHeaterState  = false;
     actuators.coolFanOn = true;
   }
 
+  // Anti-cycling ochrana pro topení
+  if (desiredHeaterState != lastHeaterState) {
+    if (now - lastHeaterChangeMs >= HEATER_MIN_CYCLE_MS) {
+      actuators.heaterOn = desiredHeaterState;
+      lastHeaterState = desiredHeaterState;
+      lastHeaterChangeMs = now;
+    }
+    // else: necháme současný stav, ještě neuplynul minimální čas
+  } else {
+    actuators.heaterOn = desiredHeaterState;
+  }
+
   // ---------- VLHČENÍ ----------
+  bool desiredHumidifierState = actuators.humidifierOn;
+
   if (prog.controlHumidity) {
     if (hum < prog.targetHumidity - humHyst) {
-      actuators.humidifierOn = true;
+      desiredHumidifierState = true;
     } else if (hum > prog.targetHumidity + humHyst) {
-      actuators.humidifierOn = false;
+      desiredHumidifierState = false;
     }
   } else {
-    actuators.humidifierOn = false;
+    desiredHumidifierState = false;
+  }
+
+  // Anti-cycling ochrana pro zvlhčovač
+  if (desiredHumidifierState != lastHumidifierState) {
+    if (now - lastHumidifierChangeMs >= HUMIDIFIER_MIN_CYCLE_MS) {
+      actuators.humidifierOn = desiredHumidifierState;
+      lastHumidifierState = desiredHumidifierState;
+      lastHumidifierChangeMs = now;
+    }
+    // else: necháme současný stav, ještě neuplynul minimální čas
+  } else {
+    actuators.humidifierOn = desiredHumidifierState;
   }
 
   // ---------- VNITŘNÍ VENTILÁTOR ----------
