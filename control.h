@@ -18,6 +18,9 @@ struct ControlRuntimeState {
 
 extern ControlRuntimeState controlState;
 
+// PANIC STOP - global emergency shutdown
+extern bool panicStop;
+
 void initControl();
 void updateControl();
 
