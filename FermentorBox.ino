@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 
 #include "config.h"
 #include "sensors.h"
@@ -27,7 +28,7 @@ bool panicStop = false;
 constexpr int PIN_POT         = 34; // otočný potenciometr (střední vývod na tento pin)
 constexpr int PIN_BTN_MODE    = 4;  // přepnutí AUTO <-> MANUAL (TEST)
 constexpr int PIN_BTN_PARAM   = 5;  // přepíná, co ovládá potenciometr (T / RH / FAN)
-constexpr int PIN_BTN_HEATER  = 12; // v MANUAL (TEST) režimu: přepnout topení
+constexpr int PIN_BTN_HEATER  = 25; // v MANUAL (TEST) režimu: přepnout topení (změněno z GPIO 12 - strapping pin)
 constexpr int PIN_BTN_HUMID   = 13; // v MANUAL (TEST) režimu: přepnout zvlhčovač
 constexpr int PIN_BTN_COOL    = 14; // v MANUAL (TEST) režimu: přepnout chladicí ventilátor
 constexpr int PIN_BTN_STOP    = 15; // PANIC: vypnout topení, zvlhčovač, chlazení, vnitřní fan
@@ -308,6 +309,12 @@ void setup() {
   Serial.println();
   Serial.println("=== FermentorBox starting ===");
 
+  // Initialize Hardware Watchdog Timer (10 second timeout)
+  // If ESP32 freezes with heater active, watchdog will restart the device
+  esp_task_wdt_init(10, true);
+  esp_task_wdt_add(NULL);
+  Serial.println("[watchdog] Initialized (10s timeout)");
+
   initConfig();
   loadConfig();
 
@@ -328,6 +335,9 @@ void setup() {
 // LOOP
 // -------------------------------------------------------
 void loop() {
+  // Reset watchdog timer to prevent ESP32 restart
+  esp_task_wdt_reset();
+
   handleSerialCommands();  
   handleHardwareControls();   // fyzické ovládání
   updateSensors();            // senzory cteme vzdy
