@@ -60,10 +60,10 @@ Noctua PWM ventilátor má 4 vodiče:
 ### Senzory a displej
 | Pin | Funkce | Poznámka |
 |-----|--------|----------|
-| 21 | I2C SDA | OLED displej |
-| 22 | I2C SCL | OLED displej |
-| 16 | DHT22 #1 Data | Teplotní/vlhkostní senzor |
-| 17 | DHT22 #2 Data | Teplotní/vlhkostní senzor (záloha) |
+| 32 | I2C SDA | OLED displej SH1106 |
+| 33 | I2C SCL | OLED displej SH1106 |
+| 27 | DHT22 #1 Data | Teplotní/vlhkostní senzor |
+| 26 | DHT22 #2 Data | Teplotní/vlhkostní senzor (záloha) |
 
 ### Výkonové výstupy
 | Pin | Funkce | Poznámka |
@@ -109,10 +109,10 @@ ESP32 DevKit                    12V Power Supply
     │
     ├─[5V]←─[Step-down 12V→5V]───────[12V]
     │
-    ├─[GPIO 16]───[DHT22 #1 Data]
-    ├─[GPIO 17]───[DHT22 #2 Data]
+    ├─[GPIO 27]───[DHT22 #1 Data]
+    ├─[GPIO 26]───[DHT22 #2 Data]
     │
-    ├─[GPIO 21/22]─[I2C: SDA/SCL]─[OLED SH1106]
+    ├─[GPIO 32/33]─[I2C: SDA/SCL]─[OLED SH1106]
     │
     └─[GPIO 34/4/5/25/13/14/15]─[Buttons/Pot]
 
